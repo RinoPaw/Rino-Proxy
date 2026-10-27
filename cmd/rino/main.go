@@ -23,6 +23,9 @@ Usage:
   rino core archive verify --state DIR [--json]
   rino core archive export --state DIR --output NEW_FILE
   rino core trial --state DIR --proxy http://127.0.0.1:PORT [--hold 10s]
+  rino core deploy --state DIR --controller http://127.0.0.1:9090 --proxy http://127.0.0.1:PORT --confirm
+  rino core deployment-status --state DIR
+  rino core recover --state DIR
   rino health check --proxy http://HOST:PORT [--timeout 15s] [--json]
   rino health matrix --limit 12 [--match REGEX] [--json]
   rino router render --output config.yaml [--upstream http://100.64.0.3:17890]

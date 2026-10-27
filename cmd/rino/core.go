@@ -14,6 +14,9 @@ import (
 )
 
 func runCore(args []string, output io.Writer) error {
+	if len(args) > 0 && (args[0] == "deploy" || args[0] == "watchdog" || args[0] == "recover" || args[0] == "deployment-status") {
+		return runCoreDeploy(args, output)
+	}
 	if len(args) > 0 && args[0] == "trial" {
 		return runCoreTrial(args[1:], output)
 	}
