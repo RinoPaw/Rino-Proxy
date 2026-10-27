@@ -45,7 +45,11 @@ func run(args []string, stdout io.Writer) error {
 			if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
 				return fmt.Errorf("missing value for %q", args[i])
 			}
-			if args[i] == "--manifest" { manifest = args[i+1] } else { output = args[i+1] }
+			if args[i] == "--manifest" {
+				manifest = args[i+1]
+			} else {
+				output = args[i+1]
+			}
 			i++
 		case "--help", "-h":
 			_, _ = io.WriteString(stdout, usage)
@@ -54,48 +58,74 @@ func run(args []string, stdout io.Writer) error {
 			inputs = append(inputs, args[i+1:]...)
 			i = len(args)
 		default:
-			if strings.HasPrefix(args[i], "-") { return fmt.Errorf("unknown option %q", args[i]) }
+			if strings.HasPrefix(args[i], "-") {
+				return fmt.Errorf("unknown option %q", args[i])
+			}
 			inputs = append(inputs, args[i])
 		}
 	}
-	if len(inputs) == 0 || output == "" { return errors.New("supply profiles and --output") }
+	if len(inputs) == 0 || output == "" {
+		return errors.New("supply profiles and --output")
+	}
 	if manifest != "" {
-		if err := differentPaths(manifest, output); err != nil { return err }
+		if err := differentPaths(manifest, output); err != nil {
+			return err
+		}
 	}
 	for _, input := range inputs {
-		if err := differentPaths(input, output); err != nil { return err }
+		if err := differentPaths(input, output); err != nil {
+			return err
+		}
 		if manifest != "" {
-			if err := differentPaths(input, manifest); err != nil { return err }
+			if err := differentPaths(input, manifest); err != nil {
+				return err
+			}
 		}
 	}
 	list := make([]profile.Profile, 0, len(inputs))
 	for _, input := range inputs {
 		p, err := profile.Read(input)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		list = append(list, p)
 	}
 	result, err := profile.Merge(list)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	data, err := mihomo.Export(result.Nodes)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	if manifest != "" {
 		b, err := json.MarshalIndent(result.Provenance, "", "  ")
-		if err != nil { return err }
-		if err := atomicWrite(manifest, append(b, '
-')); err != nil { return err }
+		if err != nil {
+			return err
+		}
+		if err := atomicWrite(manifest, append(b, byte(10))); err != nil {
+			return err
+		}
 	}
-	if err := atomicWrite(output, data); err != nil { return err }
-	_, _ = fmt.Fprintf(stdout, "Merged %d profiles: %d nodes, %d exact duplicates removed. Output: %s (DIRECT first)
-", len(list), len(result.Nodes), result.DuplicateCount, output)
+	if err := atomicWrite(output, data); err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintf(stdout, "Merged %d profiles: %d nodes, %d exact duplicates removed. Output: %s (DIRECT first)", len(list), len(result.Nodes), result.DuplicateCount, output)
 	return nil
 }
 
 func differentPaths(a, b string) error {
 	pa, err := filepath.Abs(a)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	pb, err := filepath.Abs(b)
-	if err != nil { return err }
-	if pa == pb { return fmt.Errorf("refusing to overwrite input/output %q", a) }
+	if err != nil {
+		return err
+	}
+	if pa == pb {
+		return fmt.Errorf("refusing to overwrite input/output %q", a)
+	}
 	infoA, errA := os.Stat(a)
 	infoB, errB := os.Stat(b)
 	if errA == nil && errB == nil && os.SameFile(infoA, infoB) {
@@ -108,15 +138,29 @@ func differentPaths(a, b string) error {
 func atomicWrite(path string, data []byte) error {
 	if fi, err := os.Lstat(path); err == nil && !fi.Mode().IsRegular() {
 		return fmt.Errorf("refusing to replace non-regular output %q", path)
-	} else if err != nil && !os.IsNotExist(err) { return err }
+	} else if err != nil && !os.IsNotExist(err) {
+		return err
+	}
 	f, err := os.CreateTemp(filepath.Dir(path), ".rino-*")
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer os.Remove(f.Name())
 	defer f.Close()
-	if err := f.Chmod(0600); err != nil { return err }
-	if _, err := f.Write(data); err != nil { return err }
-	if err := f.Sync(); err != nil { return err }
-	if err := f.Close(); err != nil { return err }
-	if err := os.Rename(f.Name(), path); err != nil { return err }
+	if err := f.Chmod(0600); err != nil {
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(f.Name(), path); err != nil {
+		return err
+	}
 	return nil
 }
