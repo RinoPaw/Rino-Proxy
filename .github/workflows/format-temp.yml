@@ -1,0 +1,26 @@
+name: Temporary feature-branch Go formatter
+on:
+  push:
+    branches:
+      - feat/core-config-preflight
+permissions: {}
+jobs:
+  format:
+    if: github.ref == 'refs/heads/feat/core-config-preflight'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Format feature-branch Go sources
+        run: |
+          gofmt -w ./cmd ./internal
+          if ! git diff --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add cmd internal
+            git commit -m 'style: gofmt config preflight sources'
+            git push origin HEAD:feat/core-config-preflight
+          fi
