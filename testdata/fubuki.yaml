@@ -1,0 +1,19 @@
+proxies:
+  - name: Japan Mirror
+    type: socks5
+    server: jp.example.invalid
+    port: 1080
+    username: example
+    password: FAKE-ONLY
+  - name: VLESS WS
+    type: vless
+    server: vless.example.invalid
+    port: 443
+    uuid: 00000000-0000-4000-8000-000000000000
+    tls: true
+    servername: example.invalid
+    network: ws
+    ws-opts:
+      path: /ws
+      headers:
+        Host: example.invalid

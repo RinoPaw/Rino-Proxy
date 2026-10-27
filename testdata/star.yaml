@@ -1,0 +1,20 @@
+# Synthetic non-routable test nodes. Never use genuine subscription secrets in Git.
+proxies:
+  - name: Japan 01
+    type: socks5
+    server: jp.example.invalid
+    port: 1080
+    username: example
+    password: FAKE-ONLY
+  - name: Hong Kong 01
+    type: http
+    server: hk.example.invalid
+    port: 8080
+    username: example
+    password: FAKE-ONLY
+proxy-groups:
+  - name: Ignored Source Group
+    type: select
+    proxies: [Japan 01, Hong Kong 01]
+rules:
+  - MATCH,DIRECT

@@ -1,0 +1,11 @@
+/local/
+/secrets/
+/.env
+/.env.*
+/merged*.yaml
+/nodes.json
+/*.secret.yaml
+/*.secrets.yaml
+*.exe
+*.test
+*.out
