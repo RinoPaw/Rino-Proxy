@@ -222,4 +222,3 @@ func ExportBaseline(stateDir, outputPath string) error {
 	}
 	return nil
 }
-

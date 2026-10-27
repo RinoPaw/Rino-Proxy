@@ -57,4 +57,3 @@ func runCore(args []string, output io.Writer) error {
 	}
 	return nil
 }
-

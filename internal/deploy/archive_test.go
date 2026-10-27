@@ -174,4 +174,3 @@ func TestArchiveExportRejectsSymlink(t *testing.T) {
 		t.Fatal("existing target modified")
 	}
 }
-
