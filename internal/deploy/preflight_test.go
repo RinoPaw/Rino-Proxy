@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"time"
 )
 
 type validatorFunc func(context.Context, string) error
@@ -182,8 +181,5 @@ func TestMihomoValidationSuppressesOutput(t *testing.T) {
 	cancel()
 	if err := (MihomoValidator{Binary: "rino-nonexistent-mihomo-XYZ"}).Validate(ctx, "something.yaml"); err == nil {
 		t.Fatal("expected cancellation error")
-	}
-	if time.Second == 0 {
-		t.Fatal("impossible")
 	}
 }
