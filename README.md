@@ -178,3 +178,46 @@ management path, so the JSON field `apply_allowed` is always `false`.
 A future write-capable transaction will require durable rollback, a watchdog,
 and an independent management channel. Do not use this report alone to
 authorize production changes.
+
+
+## v0.4: offline recovery archive (experimental)
+
+The archive commands extend the read-only `core plan` preflight. They do not
+reconfigure, restart or reload any running Mihomo process.
+
+```sh
+rino core archive prepare --current old.yaml --candidate new.yaml --state NEW_PRIVATE_DIR --mihomo mihomo
+rino core archive verify --state NEW_PRIVATE_DIR --json
+rino core archive export --state NEW_PRIVATE_DIR --output NEW_RECOVERY_FILE.yaml
+```
+
+- **Prepare** validates the candidate against the target Mihomo binary twice:
+  the source file, then its archived copy. It stores an immutable-by-convention
+  baseline snapshot, the candidate snapshot, and a journal in a **new**
+  directory; an existing directory is rejected instead of overwritten.
+  Each file is created exclusively, synced and hashed. The final
+  `journal.json` is written **last** so an interrupted prepare is detected as
+  incomplete. Validation and hashing cannot guarantee a file was not swapped
+  by an attacker with concurrent write access; keep this workspace private.
+- **Verify** checks journal shape, both snapshot checksums and whether the
+  original target still matches the baseline. This is safe after a process
+  restart and does not attempt automatic repair.
+- **Export** writes a verified baseline snapshot into a **new file only**.
+  It refuses to overwrite an existing file or the original live configuration.
+  A human operator may inspect the exported file before any deployment.
+- **Confidentiality:** the archive contains complete credentials-bearing
+  configuration data. Never commit it, upload it to CI or put it in shared
+  storage. Restrict access to the state directory using the operating system's
+  access controls (on Windows, verify NTFS ACLs; POSIX 0700/0600 alone does
+  not govern inherited Windows access). CLI JSON reports intentionally omit
+  local paths and YAML contents; checksum fingerprints still identify content.
+- **Failure boundaries:** an incomplete prepare has no valid journal and
+  requires manual disposal after inspection. `apply_allowed` remains
+  `false` in all results. Neither automatic service rollback nor crash-time
+  recovery of live networking exists yet. This implementation intentionally
+  never alters DNS, TUN, system routes, firewall or controller endpoints.
+
+The next stage of Issue #2 is an independently recoverable deployment
+transaction with a separate supervisor/watchdog and a real emergency path.
+
+[executed on device: rino-pc (6c706f50-a21c-4a1f-9bbf-39635d313ad0)]

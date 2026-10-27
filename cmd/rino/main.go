@@ -19,6 +19,9 @@ Usage:
   rino profile merge PROFILE... --output merged.yaml [--manifest nodes.json]
   rino core status [--controller http://127.0.0.1:9090] [--json]
   rino core plan --current old.yaml --candidate new.yaml [--mihomo BINARY] [--json]
+  rino core archive prepare --current old.yaml --candidate new.yaml --state NEW_DIR
+  rino core archive verify --state DIR [--json]
+  rino core archive export --state DIR --output NEW_FILE
   rino health check --proxy http://HOST:PORT [--timeout 15s] [--json]
   rino health matrix --limit 12 [--match REGEX] [--json]
   rino router render --output config.yaml [--upstream http://100.64.0.3:17890]
