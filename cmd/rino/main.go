@@ -17,6 +17,7 @@ const usage = `Rino Proxy v0.1 — Mihomo Profile Flatten
 
 Usage:
   rino profile merge PROFILE... --output merged.yaml [--manifest nodes.json]
+  rino health check --proxy http://HOST:PORT [--timeout 15s] [--json]
 
 Generated configs default to DIRECT and never change your active proxy.
 Provider-only YAML, remote URLs and automatic subscription updates are not yet supported.
@@ -33,6 +34,9 @@ func run(args []string, stdout io.Writer) error {
 	if len(args) == 0 || (len(args) == 1 && (args[0] == "-h" || args[0] == "--help")) {
 		_, _ = io.WriteString(stdout, usage)
 		return nil
+	}
+	if len(args) > 0 && args[0] == "health" {
+		return runHealth(args[1:], stdout)
 	}
 	if len(args) < 2 || args[0] != "profile" || args[1] != "merge" {
 		return errors.New("unknown command; use --help")

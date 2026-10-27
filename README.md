@@ -1,6 +1,6 @@
 # Rino Proxy
 
-A small, cross-platform control plane for Mihomo. **v0.1 flattens multiple local Mihomo YAML profiles into one standalone configuration.** It does not take over your live proxy or change OpenWrt.
+A small, cross-platform control plane for Mihomo. **v0.1 flattens multiple local Mihomo YAML profiles; v0.2 checks website reachability through an explicitly supplied proxy.** It does not take over your live proxy or change OpenWrt.
 
 ## Requirements
 
@@ -26,9 +26,22 @@ Windows build: `go build -o rino.exe ./cmd/rino`.
 - **DIRECT is the first selection**. Output uses `allow-lan: false`, no TUN and no remote admin API.
 - Writes output files with restrictive permissions, using temporary files and atomic rename. Refuses to overwrite input files and symlinks.
 
+## Website checks through an existing HTTP proxy
+
+Use the Tailnet proxy after it has been deployed and verified (this command does not change proxies or router rules):
+
+\`\`\`sh
+go run ./cmd/rino health check --proxy http://PROXY_HOST:PORT
+go run ./cmd/rino health check --proxy http://PROXY_HOST:PORT --json
+\`\`\`
+
+Each run checks Bilibili API (200 with code 0 or unauthenticated -101), GitHub home (200), Google generate_204 (204), YouTube (200), and ChatGPT (200 without challenge markers). Cloudflare challenges, rate limits, and unrecognized responses are distinguished. The final acceptance expression is \`bilibili && github && (google || youtube || chatgpt)\`.
+
+A successful website check only proves reachability from this proxy at that moment; it does not verify browser sign-in, video playback, Git operations, or all app features. The command requires an explicit HTTP proxy; it does not silently route traffic through Windows system proxy settings.
+
 ## Limits
 
-Only inline YAML Profile nodes are supported. Provider-only YAML, remote URLs, encrypted sharing links and automatic subscription refresh are future work. v0.1 does not detect real website availability or switch nodes dynamically. Keep your generated configuration outside your live Nikki/Mihomo directories.
+Only inline YAML Profile nodes are supported. Provider-only YAML, remote URLs, encrypted sharing links and automatic subscription refresh are future work. v0.2 checks website reachability through a given proxy but does not select or switch individual nodes dynamically. Keep your generated configuration outside your live Nikki/Mihomo directories.
 
 ## Security
 
