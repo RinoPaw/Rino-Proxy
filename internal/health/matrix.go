@@ -102,7 +102,7 @@ func (c *Controller) selectNode(ctx context.Context, name string) error {
 func EvaluateMatrix(rows []NodeResult) Matrix {
 	m := Matrix{Nodes: rows, Coverage: map[string]bool{}}
 	for _, row := range rows {
-		if row.Passed {
+		if Satisfies(row.Results) {
 			m.SingleNodePass = true
 		}
 		for _, site := range row.Results {
