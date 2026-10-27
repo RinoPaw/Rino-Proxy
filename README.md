@@ -132,3 +132,26 @@ The `testdata/` profiles use fake credentials and intentionally invalid hostname
 - v0.3: isolated node-by-site matrix and Tencent site-specific fallback groups (implemented). Continuous scoring and anti-flap tuning remain future work.
 - v0.4: production-safe Mihomo API control, reload/rollback and core adapters.
 - v0.5: Web dashboard and controlled Windows/OpenWrt deployment.
+
+## v0.4: read-only local core status
+
+```sh
+rino core status
+rino core status --controller http://127.0.0.1:9091 --json
+# For a controller configured with a secret, set RINO_MIHOMO_SECRET in the
+# local process environment. Never put the token on the command line.
+```
+
+This command makes only three GET requests to the **local** Mihomo controller:
+`/version`, `/configs`, and `/proxies`. It prints a limited configuration
+summary and proxy-group selections, not raw node settings or credentials.
+It accepts only loopback IP addresses (`127.0.0.1` or `[::1]`) and never follows
+redirects or honors HTTP proxy environment variables. To inspect a remote
+instance, use an authenticated SSH local port forward and specify its
+local bound port. Do not expose controller ports to the internet.
+
+**No live reload, rule changes, restarts, firewall changes, or TUN changes
+are performed by `core status`.** Transactional apply and rollback remain
+future work. Selected group/node *names* can still be sensitive: review
+output before sharing logs. This is a read-only development milestone, not
+a replacement for OpenClash or a production deployment instruction.

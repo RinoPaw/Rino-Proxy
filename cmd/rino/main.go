@@ -17,6 +17,7 @@ const usage = `Rino Proxy v0.1 — Mihomo Profile Flatten
 
 Usage:
   rino profile merge PROFILE... --output merged.yaml [--manifest nodes.json]
+  rino core status [--controller http://127.0.0.1:9090] [--json]
   rino health check --proxy http://HOST:PORT [--timeout 15s] [--json]
   rino health matrix --limit 12 [--match REGEX] [--json]
   rino router render --output config.yaml [--upstream http://100.64.0.3:17890]
@@ -37,6 +38,9 @@ func run(args []string, stdout io.Writer) error {
 	if len(args) == 0 || (len(args) == 1 && (args[0] == "-h" || args[0] == "--help")) {
 		_, _ = io.WriteString(stdout, usage)
 		return nil
+	}
+	if len(args) > 0 && args[0] == "core" {
+		return runCore(args[1:], stdout)
 	}
 	if len(args) > 0 && args[0] == "policy" {
 		return runPolicy(args[1:], stdout)
