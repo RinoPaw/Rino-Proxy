@@ -9,3 +9,9 @@
 *.exe
 *.test
 *.out
+
+# Local experiment output, runtime binary and snapshots
+/rino-router-test
+/rino-tx-test
+/rino-router.generated.yaml
+/matrix-results-*.local.json
