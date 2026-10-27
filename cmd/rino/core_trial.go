@@ -41,10 +41,10 @@ func runCoreTrial(args []string, output io.Writer) error {
 	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil {
 		return errors.New("probe target must be an HTTPS URL")
 	}
-	// Reuse the controller address validator so even the test proxy cannot
-	// accidentally target a LAN/WAN host.
-	if _, err := core.NewClient(*proxy, "", *timeout); err != nil {
-		return fmt.Errorf("proxy must be a loopback HTTP listener: %w", err)
+	// OpenWrt may bind its proxy to br-lan; require an address assigned
+	// to THIS host. The controller remains strictly loopback-only.
+	if err := core.ValidateLocalProxy(*proxy); err != nil {
+		return fmt.Errorf("proxy must be a local HTTP listener: %w", err)
 	}
 	control, err := core.NewClient(*controller, os.Getenv("RINO_MIHOMO_SECRET"), *timeout)
 	if err != nil {

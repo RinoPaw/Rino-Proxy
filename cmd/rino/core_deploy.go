@@ -19,8 +19,8 @@ import (
 )
 
 func localProxyProbe(address, target string, timeout time.Duration) (func(context.Context) error, error) {
-	if _, err := core.NewClient(address, "", timeout); err != nil {
-		return nil, errors.New("proxy must be a local HTTP listener")
+	if err := core.ValidateLocalProxy(address); err != nil {
+		return nil, fmt.Errorf("proxy must be assigned to this host: %w", err)
 	}
 	u, err := url.Parse(target)
 	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil {
