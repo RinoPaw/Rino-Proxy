@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestChatGPT403IsAcceptableFallback(t *testing.T) {
+func TestChatGPTAnyHTTPResponseIsAvailable(t *testing.T) {
 	onlyChallenge := strings.Replace(matrix, "\"status\":\"PASS\",\"http_code\":200,\"latency_ms\":350", "\"status\":\"CHALLENGE\",\"http_code\":403,\"latency_ms\":350", 1)
 	output, _, err := Render([]byte(config), []byte(onlyChallenge), 8)
 	if err != nil {
@@ -21,7 +21,7 @@ func TestChatGPT403IsAcceptableFallback(t *testing.T) {
 		if g["name"] != "Rino-ChatGPT" {
 			continue
 		}
-		if g["expected-status"] != "200/403" {
+		if g["expected-status"] != "*" {
 			t.Fatalf("incorrect health status: %v", g["expected-status"])
 		}
 		opts := g["proxies"].([]any)
