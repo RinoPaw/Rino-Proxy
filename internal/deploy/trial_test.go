@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,12 +14,15 @@ import (
 )
 
 type fakeRuntime struct {
+	mu          sync.Mutex
 	mode        string
 	changes     []string
 	reloadError string
 }
 
 func (r *fakeRuntime) Snapshot(context.Context) (core.Snapshot, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	return core.Snapshot{
 		Version: "test-core", ProxyEntries: 2,
 		Config: core.Config{Mode: r.mode, MixedPort: 18993},
@@ -26,6 +30,8 @@ func (r *fakeRuntime) Snapshot(context.Context) (core.Snapshot, error) {
 }
 
 func (r *fakeRuntime) ReloadPayload(_ context.Context, input []byte) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	s := string(input)
 	if strings.Contains(s, "mode: direct") {
 		r.mode = "direct"
