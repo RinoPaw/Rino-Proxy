@@ -20,6 +20,7 @@ Usage:
   rino health check --proxy http://HOST:PORT [--timeout 15s] [--json]
   rino health matrix --limit 12 [--match REGEX] [--json]
   rino router render --output config.yaml [--upstream http://100.64.0.3:17890]
+  rino policy render --base backup.yaml --matrix matrix.json --output candidate.yaml
 
 Generated configs default to DIRECT and never change your active proxy.
 Provider-only YAML, remote URLs and automatic subscription updates are not yet supported.
@@ -36,6 +37,9 @@ func run(args []string, stdout io.Writer) error {
 	if len(args) == 0 || (len(args) == 1 && (args[0] == "-h" || args[0] == "--help")) {
 		_, _ = io.WriteString(stdout, usage)
 		return nil
+	}
+	if len(args) > 0 && args[0] == "policy" {
+		return runPolicy(args[1:], stdout)
 	}
 	if len(args) > 0 && args[0] == "router" {
 		return runRouter(args[1:], stdout)
