@@ -14,6 +14,9 @@ import (
 )
 
 func runCore(args []string, output io.Writer) error {
+	if len(args) > 0 && args[0] == "archive" {
+		return runCoreArchive(args[1:], output)
+	}
 	if len(args) > 0 && args[0] == "plan" {
 		return runCorePlan(args[1:], output)
 	}
