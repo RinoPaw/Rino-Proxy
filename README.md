@@ -65,6 +65,44 @@ The matrix changes the `RinoTest` selector one node at a time, requests Bilibili
 
 The output distinguishes **single-node pass** (one tested node satisfies the full expression) from **coverage pass** (the union of tested nodes covers all required sites). Coverage alone cannot guarantee automatic site routing: separate per-site policy groups are still needed. Results are time-sensitive and reflect the network of the machine running the isolated Mihomo core. Keep node-bearing configs and raw results private, and never commit subscription credentials.
 
+
+## Deployed beta gateway on OpenWrt
+
+Rino Proxy can generate a LAN-scoped Mihomo configuration that uses a reachable, private HTTP proxy on Tailscale as upstream. This early deployment uses a **single Tailnet fallback**; it does not yet choose different airport nodes automatically per website.
+
+```sh
+go run ./cmd/rino router render --output rino-router.generated.yaml \
+  --upstream http://100.64.0.3:17890
+mihomo -t -f rino-router.generated.yaml
+```
+
+On the JCG Q30 PRO OpenWrt router, the deployed files are:
+
+- `/etc/rino-proxy.yaml`: generated Mihomo configuration
+- `/etc/init.d/rino-proxy`: procd service (see [rino-proxy.init](rino-proxy.init))
+- `/usr/bin/rino`: ARM64 Rino Proxy diagnostic CLI
+
+The live LAN proxy listens at `172.27.207.1:7890`. Its HTTP/SOCKS mixed-port accepts connections from the local `172.27.207.0/24` network; **there is currently no LAN proxy password**, so keep the Wi-Fi/LAN trusted. WAN and Tailscale interfaces have no new proxy listener. DNS, firewall, default route, TUN and transparent interception are unchanged.
+
+Domestic Bilibili domains route DIRECT; GitHub, Google, YouTube and ChatGPT domains go through the Tencent Tailnet upstream. Everything else defaults to DIRECT. This is an explicit-proxy beta; clients must configure the LAN proxy manually. The upstream Tencent server handles its own node pool. Cloudflare challenges may still block ChatGPT.
+
+```sh
+# On the router, as root:
+/etc/init.d/rino-proxy status
+/etc/init.d/rino-proxy enabled
+rino health check --proxy http://172.27.207.1:7890 --timeout 12s --json
+cat /tmp/rino-health.json  # monitoring snapshot (every 10 minutes)
+```
+
+Emergency rollback (removes only this beta gateway; does not touch Tailscale, WAN or Tencent):
+
+```sh
+/etc/init.d/rino-proxy stop
+/etc/init.d/rino-proxy disable
+```
+
+The service uses OpenWrt's procd (late boot start, respawn). A single `RINO_PROXY_HEALTH` root crontab entry writes a snapshot under `/tmp` every 10 minutes; monitoring does not change routing or reboot the device. The router retains the existing Mihomo package. Real provider secrets must stay off GitHub.
+
 ## Limits
 
 Only inline YAML Profile nodes are supported. Provider-only YAML, remote URLs, encrypted sharing links and automatic subscription refresh are future work. Matrix mode switches individual nodes of a **dedicated, disposable** Mihomo selector; it does not yet control live traffic, automatically choose a production node, or make per-site routing decisions.
