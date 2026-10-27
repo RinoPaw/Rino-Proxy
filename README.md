@@ -35,7 +35,7 @@ go run ./cmd/rino health check --proxy http://PROXY_HOST:PORT
 go run ./cmd/rino health check --proxy http://PROXY_HOST:PORT --json
 ```
 
-Each run checks Bilibili API (200 with code 0 or unauthenticated -101), GitHub home (200), Google generate_204 (204), YouTube (200), and ChatGPT (HTTP 200 or, by user-defined policy, Cloudflare challenge HTTP 403). A 403 remains reported as `CHALLENGE` and is accepted only for ChatGPT reachability; 401, timeouts, rate limits, and unexpected content remain failures. The final acceptance expression is `bilibili && github && (google || youtube || chatgpt)`.
+Each probe connects through the explicitly specified HTTP proxy to the target HTTPS endpoint. **Any real HTTP response from that endpoint means reachable**, including redirects and HTTP 401, 403, 404, 429 or 5xx. Redirects are not followed, and page contents or API error codes do not affect connectivity. A proxy CONNECT failure, TLS error or timeout has no target HTTP response and remains `FAIL`. The final acceptance expression stays `bilibili && github && (google || youtube || chatgpt)`.
 
 A successful website check only proves reachability from this proxy at that moment; it does not verify browser sign-in, video playback, Git operations, or all app features. The command requires an explicit HTTP proxy; it does not silently route traffic through Windows system proxy settings.
 
@@ -112,7 +112,7 @@ rino policy render --base backup.yaml --matrix matrix.json --output candidate.ya
 mihomo -t -f candidate.yaml
 ```
 
-Never commit `backup.yaml`, `matrix.json`, or the generated config. In the ChatGPT group, HTTP 200 nodes are preferred over HTTP 403 candidates, with `expected-status: 200/403` for periodic node checks. HTTP 403 represents acceptable network reachability only; it does not prove an authenticated chat session works.
+Never commit `backup.yaml`, `matrix.json`, or the generated config. Every site-specific `fallback` group uses `expected-status: '*'` so any HTTP response is accepted during periodic checks. Candidates are ordered by observed latency, regardless of HTTP status. HTTP reachability does not prove browser login, successful Git operations or that application requests work.
 
 The Tencent production config remains `/etc/mihomo/backup.yaml`. Rollback snapshots are stored locally as `/etc/mihomo/backup.yaml.rino-before-403` (previous site-based routing) and `/etc/mihomo/backup.yaml.rino-before-sites` (original TX-only routing). Both contain credentials and must remain private.
 
@@ -120,7 +120,7 @@ The LAN remains **explicit proxy only**, with no firewall or TUN interception, a
 
 ## Limits
 
-Only inline YAML Profile nodes are supported. Provider-only YAML, remote URLs, encrypted sharing links and automatic subscription refresh are future work. Matrix mode switches individual nodes of a **dedicated, disposable** Mihomo selector; it does not yet control live traffic, automatically choose a production node, or make per-site routing decisions.
+Only inline YAML Profile nodes are supported. Provider-only YAML, remote URLs, encrypted sharing links and automatic subscription refresh are future work. Matrix mode switches individual nodes only in a **dedicated, disposable** Mihomo selector. The Tencent production config uses the matrix snapshot to build site-specific fallback groups, but the controller does not yet continuously refresh those candidate rankings.
 
 ## Security
 
@@ -128,7 +128,7 @@ The `testdata/` profiles use fake credentials and intentionally invalid hostname
 
 ## Next steps
 
-- v0.2: node × site probes, `OK/FAIL/CHALLENGE/RATE_LIMIT`, and the acceptance target `bilibili && github && (google || youtube || chatgpt)`.
-- v0.3: isolated node-by-site matrix (implemented); site-specific policy groups, automatic selection, fallback and cooldowns remain future work.
+- v0.2: HTTPS target reachability and the acceptance expression (implemented; status codes intentionally ignored).
+- v0.3: isolated node-by-site matrix and Tencent site-specific fallback groups (implemented). Continuous scoring and anti-flap tuning remain future work.
 - v0.4: production-safe Mihomo API control, reload/rollback and core adapters.
 - v0.5: Web dashboard and controlled Windows/OpenWrt deployment.
