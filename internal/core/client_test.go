@@ -25,11 +25,11 @@ func TestReadOnlySnapshotAndRedaction(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/version":
-			fmt.Fprint(w, \`{"version":"1.19.31","meta":true}\`)
+			fmt.Fprint(w, `{"version":"1.19.31","meta":true}`)
 		case "/configs":
-			fmt.Fprint(w, \`{"mode":"rule","log-level":"warning","mixed-port":7890,"allow-lan":false,"tun":{"enable":true},"authentication":["do-not-output"],"secret":"do-not-output"}\`)
+			fmt.Fprint(w, `{"mode":"rule","log-level":"warning","mixed-port":7890,"allow-lan":false,"tun":{"enable":true},"authentication":["do-not-output"],"secret":"do-not-output"}`)
 		case "/proxies":
-			fmt.Fprint(w, \`{"proxies":{"DIRECT":{"type":"Direct"},"B":{"type":"Selector","now":"NodeA","all":["NodeA"]},"A":{"type":"Fallback","now":"NodeB","all":["NodeA","NodeB"]},"NodeA":{"type":"Vless","password":"do-not-output"}}}\`)
+			fmt.Fprint(w, `{"proxies":{"DIRECT":{"type":"Direct"},"B":{"type":"Selector","now":"NodeA","all":["NodeA"]},"A":{"type":"Fallback","now":"NodeB","all":["NodeA","NodeB"]},"NodeA":{"type":"Vless","password":"do-not-output"}}}`)
 		default:
 			t.Errorf("unexpected endpoint %s", r.URL.Path)
 		}
@@ -104,7 +104,7 @@ func TestBoundedResponses(t *testing.T) {
 }
 
 func TestRejectInvalidJSON(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, \`{"version":\`) }))
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, `{"version":`) }))
 	defer srv.Close()
 	c, _ := NewClient(srv.URL, "", time.Second)
 	_, err := c.Snapshot(context.Background())

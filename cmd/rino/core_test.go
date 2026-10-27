@@ -13,11 +13,11 @@ func TestCoreStatusCLI(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/version":
-			fmt.Fprint(w, \`{"version":"v1.19.31","meta":true}\`)
+			fmt.Fprint(w, `{"version":"v1.19.31","meta":true}`)
 		case "/configs":
-			fmt.Fprint(w, \`{"mode":"rule","mixed-port":7890}\`)
+			fmt.Fprint(w, `{"mode":"rule","mixed-port":7890}`)
 		case "/proxies":
-			fmt.Fprint(w, \`{"proxies":{"GLOBAL":{"type":"Selector","now":"DIRECT","all":["DIRECT"]}}}\`)
+			fmt.Fprint(w, `{"proxies":{"GLOBAL":{"type":"Selector","now":"DIRECT","all":["DIRECT"]}}}`)
 		default:
 			t.Fatalf("unknown path %s", r.URL.Path)
 		}

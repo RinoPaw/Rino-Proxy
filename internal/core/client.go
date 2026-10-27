@@ -62,28 +62,28 @@ func NewClient(address, secret string, timeout time.Duration) (*Client, error) {
 // Config holds an allowlisted summary; the full runtime configuration may
 // include credentials and must never be serialized by this client.
 type Config struct {
-	Mode        string \`json:"mode"\`
-	LogLevel    string \`json:"log_level"\`
-	MixedPort   int    \`json:"mixed_port"\`
-	BindAddress string \`json:"bind_address"\`
-	AllowLAN    bool   \`json:"allow_lan"\`
-	IPv6        bool   \`json:"ipv6"\`
-	TUNEnabled  bool   \`json:"tun_enabled"\`
+	Mode        string `json:"mode"`
+	LogLevel    string `json:"log_level"`
+	MixedPort   int    `json:"mixed_port"`
+	BindAddress string `json:"bind_address"`
+	AllowLAN    bool   `json:"allow_lan"`
+	IPv6        bool   `json:"ipv6"`
+	TUNEnabled  bool   `json:"tun_enabled"`
 }
 
 type Group struct {
-	Name       string \`json:"name"\`
-	Type       string \`json:"type"\`
-	Selected   string \`json:"selected"\`
-	Candidates int    \`json:"candidates"\`
+	Name       string `json:"name"`
+	Type       string `json:"type"`
+	Selected   string `json:"selected"`
+	Candidates int    `json:"candidates"`
 }
 
 type Snapshot struct {
-	Version      string  \`json:"version"\`
-	Meta         bool    \`json:"meta"\`
-	Config       Config  \`json:"config"\`
-	ProxyEntries int     \`json:"proxy_entries"\`
-	Groups       []Group \`json:"groups"\`
+	Version      string  `json:"version"`
+	Meta         bool    `json:"meta"`
+	Config       Config  `json:"config"`
+	ProxyEntries int     `json:"proxy_entries"`
+	Groups       []Group `json:"groups"`
 }
 
 func (c *Client) get(ctx context.Context, path string, dst any) error {
@@ -120,8 +120,8 @@ func (c *Client) get(ctx context.Context, path string, dst any) error {
 // It does not modify the Mihomo instance or return raw proxy configurations.
 func (c *Client) Snapshot(ctx context.Context) (Snapshot, error) {
 	var version struct {
-		Version string \`json:"version"\`
-		Meta    bool   \`json:"meta"\`
+		Version string `json:"version"`
+		Meta    bool   `json:"meta"`
 	}
 	if err := c.get(ctx, "/version", &version); err != nil {
 		return Snapshot{}, err
@@ -130,25 +130,25 @@ func (c *Client) Snapshot(ctx context.Context) (Snapshot, error) {
 		return Snapshot{}, errors.New("controller returned an empty version")
 	}
 	var config struct {
-		Mode        string \`json:"mode"\`
-		LogLevel    string \`json:"log-level"\`
-		MixedPort   int    \`json:"mixed-port"\`
-		BindAddress string \`json:"bind-address"\`
-		AllowLAN    bool   \`json:"allow-lan"\`
-		IPv6        bool   \`json:"ipv6"\`
+		Mode        string `json:"mode"`
+		LogLevel    string `json:"log-level"`
+		MixedPort   int    `json:"mixed-port"`
+		BindAddress string `json:"bind-address"`
+		AllowLAN    bool   `json:"allow-lan"`
+		IPv6        bool   `json:"ipv6"`
 		TUN         struct {
-			Enable bool \`json:"enable"\`
-		} \`json:"tun"\`
+			Enable bool `json:"enable"`
+		} `json:"tun"`
 	}
 	if err := c.get(ctx, "/configs", &config); err != nil {
 		return Snapshot{}, err
 	}
 	var proxies struct {
 		Proxies map[string]struct {
-			Type string   \`json:"type"\`
-			Now  string   \`json:"now"\`
-			All  []string \`json:"all"\`
-		} \`json:"proxies"\`
+			Type string   `json:"type"`
+			Now  string   `json:"now"`
+			All  []string `json:"all"`
+		} `json:"proxies"`
 	}
 	if err := c.get(ctx, "/proxies", &proxies); err != nil {
 		return Snapshot{}, err
