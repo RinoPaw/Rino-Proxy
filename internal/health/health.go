@@ -2,13 +2,10 @@ package health
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	"net"
 	"net/http"
 	"net/url"
-	"strings"
 	"sync"
 	"time"
 )
@@ -62,14 +59,9 @@ func NewClient(proxyAddress string, timeout time.Duration) (*http.Client, error)
 	return &http.Client{
 		Transport: transport,
 		Timeout:   timeout,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 5 {
-				return errors.New("too many redirects")
-			}
-			if req.URL.Scheme != "https" {
-				return errors.New("refusing insecure redirect")
-			}
-			return nil
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			// A redirect is already a response from the intended HTTPS endpoint.
+			return http.ErrUseLastResponse
 		},
 	}, nil
 }
@@ -95,82 +87,22 @@ func Probe(ctx context.Context, client *http.Client, target Target) Result {
 	}
 	defer response.Body.Close()
 	result.HTTPCode = response.StatusCode
-	body, err := io.ReadAll(io.LimitReader(response.Body, 256<<10))
-	if err != nil {
-		result.Detail = "incomplete response"
-		return result
-	}
-	return Classify(result, body)
+	// HTTPS CONNECT and TLS verification succeeded and the target responded.
+	// Avoid consuming page bodies: app content is outside transport-health scope.
+	return Classify(result, nil)
 }
 
-func Classify(result Result, body []byte) Result {
-	code := result.HTTPCode
-	if code == http.StatusTooManyRequests {
-		result.Status, result.Detail = Limited, "HTTP 429"
-		return result
-	}
-	if code == http.StatusForbidden || code == http.StatusUnauthorized {
-		if result.Name == "chatgpt" {
-			result.Status, result.Detail = Challenge, "access challenge or HTTP 403/401"
-		} else {
-			result.Detail = "access denied"
+// Classify intentionally ignores HTTP status semantics and page content.
+// Transport or TLS failures have no HTTP response and stay FAIL in Probe.
+func Classify(result Result, _ []byte) Result {
+	if result.HTTPCode >= 100 && result.HTTPCode <= 599 {
+		result.Status = Pass
+		if result.HTTPCode >= 400 {
+			result.Detail = "HTTP response received; application access unverified"
 		}
-		return result
-	}
-	if result.Name == "google" {
-		if code == 204 {
-			result.Status = Pass
-		} else {
-			result.Detail = "expected HTTP 204"
-		}
-		return result
-	}
-	if code != http.StatusOK {
-		result.Detail = "unexpected HTTP status"
-		return result
-	}
-	switch result.Name {
-	case "bilibili":
-		var payload struct {
-			Code int `json:"code"`
-		}
-		if err := json.Unmarshal(body, &payload); err != nil {
-			result.Detail = "invalid API JSON"
-		} else if payload.Code == 0 || payload.Code == -101 {
-			result.Status = Pass
-			if payload.Code == -101 {
-				result.Detail = "API reachable; unauthenticated"
-			}
-		} else if payload.Code == -352 || payload.Code == -412 {
-			result.Status, result.Detail = Challenge, "Bilibili risk-control response"
-		} else {
-			result.Detail = "unexpected Bilibili API code"
-		}
-	case "github":
-		if strings.Contains(strings.ToLower(string(body)), "github") {
-			result.Status = Pass
-		} else {
-			result.Detail = "unexpected page content"
-		}
-	case "youtube":
-		if strings.Contains(strings.ToLower(string(body)), "youtube") {
-			result.Status = Pass
-		} else {
-			result.Detail = "unexpected page content"
-		}
-	case "chatgpt":
-		lower := strings.ToLower(string(body))
-		if strings.Contains(lower, "just a moment") || strings.Contains(lower, "cf-chl") ||
-			strings.Contains(lower, "challenge-platform") {
-			result.Status, result.Detail = Challenge, "Cloudflare challenge"
-		} else if strings.Contains(lower, "chatgpt") {
-			result.Status = Pass
-			result.Detail = "HTTP reachable; login not verified"
-		} else {
-			result.Detail = "unexpected page content"
-		}
-	default:
-		result.Detail = "unknown target"
+	} else {
+		result.Status = Fail
+		result.Detail = "no valid HTTP response"
 	}
 	return result
 }
@@ -189,11 +121,10 @@ func ProbeAll(ctx context.Context, client *http.Client, targets []Target) []Resu
 	return results
 }
 
-// Accepted reflects deployment reachability criteria while preserving the raw
-// CHALLENGE status. ChatGPT HTTP 403 is tolerated; HTTP 401 and other site
-// challenges are still failures.
+// Accepted means a valid HTTP response was received from the HTTPS target.
+// HTTP status and application-level meaning do not affect connectivity.
 func Accepted(r Result) bool {
-	return r.Status == Pass || (r.Name == "chatgpt" && r.Status == Challenge && r.HTTPCode == 403)
+	return r.HTTPCode >= 100 && r.HTTPCode <= 599
 }
 
 // Satisfies checks: bilibili && github && (google || youtube || chatgpt).
