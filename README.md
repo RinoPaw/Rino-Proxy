@@ -268,3 +268,50 @@ the candidate from being applied.
 
 Next: detached watchdog and transaction promotion to a persistent live
 config, with a separate recovery path.
+
+## v0.4: persistent deployment with an independent watchdog (experimental)
+
+```sh
+rino core archive prepare --current active.yaml --candidate new.yaml \
+  --state NEW_PRIVATE_DIR --mihomo /path/to/mihomo
+
+rino core deploy --state NEW_PRIVATE_DIR \
+  --controller http://127.0.0.1:9090 --proxy http://127.0.0.1:7890 \
+  --target https://api.bilibili.com/x/web-interface/nav --hold 5s --confirm
+
+rino core deployment-status --state NEW_PRIVATE_DIR
+rino core recover --state NEW_PRIVATE_DIR
+```
+
+**This command replaces the archived target file and hot-reloads the running
+Mihomo instance.** Always test on a disposable instance first; `--confirm`
+explicitly acknowledges a live on-disk modification. Never run it on a
+shared dorm gateway before ensuring separate management access and a reboot
+recovery path.
+
+The manager (1) verifies archive digests, target file, controller and
+baseline connectivity, (2) writes a durable `pending.json`, (3) starts
+a separate `rino core watchdog` OS process and waits for its ready file,
+(4) atomically replaces the target YAML using a temporary file in the same
+directory and reloads Mihomo through the loopback controller, (5) checks
+the candidate runtime and a real outbound HTTPS response, (6) keeps the
+candidate live for a bounded observation period and writes an exclusive
+`committed` marker. Once committed, the watchdog exits.
+
+If the deployment or its health check fails, the manager attempts immediate
+rollback. If the manager is forcibly terminated, the independently started
+watchdog uses the persisted pending deadline to restore the baseline file
+and core configuration. It records `recovered` or `recovery.failed`.
+`core recover` is an explicit repair entry point after a crash or a host
+restart. Archive contents and local watchdog logs must remain private.
+Each deployment consumes a fresh archive; reuse is rejected.
+
+**Limits:** the watchdog is independent of the manager, but it is not
+registered as a system service. A host restart or power loss also stops
+the watchdog; the durable journal allows later manual recovery. OS ACLs,
+file ownership, service startup order, DNS reachability, routing and TUN
+must be assessed separately before production use. The test suite includes
+failure injection and an opt-in isolated real-core test that forcibly
+terminates the manager, then verifies independent recovery. External HTTP
+status responses establish reachability only and do not prove application
+access or login readiness.
