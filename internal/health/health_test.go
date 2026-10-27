@@ -16,23 +16,35 @@ func TestSatisfiesByRemoteHTTPResponse(t *testing.T) {
 		{Name: "youtube", Status: Fail},
 		{Name: "chatgpt", Status: Pass, HTTPCode: 403},
 	}
-	if !Satisfies(results) { t.Fatal("remote responses should satisfy the network condition") }
+	if !Satisfies(results) {
+		t.Fatal("remote responses should satisfy the network condition")
+	}
 	results[4].HTTPCode = 0
-	if Satisfies(results) { t.Fatal("no response from any third-term site") }
+	if Satisfies(results) {
+		t.Fatal("no response from any third-term site")
+	}
 	results[2].HTTPCode = 429
-	if !Satisfies(results) { t.Fatal("Google responding HTTP 429 still means reachable") }
+	if !Satisfies(results) {
+		t.Fatal("Google responding HTTP 429 still means reachable")
+	}
 	results[1].HTTPCode = 0
-	if Satisfies(results) { t.Fatal("GitHub must be reachable") }
+	if Satisfies(results) {
+		t.Fatal("GitHub must be reachable")
+	}
 }
 
 func TestClassifyAnyHTTPStatus(t *testing.T) {
 	for _, code := range []int{200, 204, 301, 401, 403, 404, 429, 500, 503} {
 		r := Classify(Result{Name: "bilibili", HTTPCode: code, Status: Fail}, []byte("anything"))
-		if r.Status != Pass { t.Fatalf("HTTP %d counted as failure: %+v", code, r) }
+		if r.Status != Pass {
+			t.Fatalf("HTTP %d counted as failure: %+v", code, r)
+		}
 	}
 	for _, code := range []int{0, 99, 600} {
 		r := Classify(Result{Name: "chatgpt", HTTPCode: code}, nil)
-		if r.Status != Fail { t.Fatalf("invalid HTTP code %d accepted", code) }
+		if r.Status != Fail {
+			t.Fatalf("invalid HTTP code %d accepted", code)
+		}
 	}
 }
 
@@ -44,7 +56,9 @@ func TestProbeAcceptsRedirectWithoutFollowing(t *testing.T) {
 	}))
 	defer srv.Close()
 	client := srv.Client()
-	client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
+	client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
 	r := Probe(context.Background(), client, Target{Name: "github", URL: srv.URL})
 	if r.Status != Pass || r.HTTPCode != 302 || calls != 1 {
 		t.Fatalf("expected original HTTPS response, not redirect follow: %+v; calls=%d", r, calls)
@@ -57,7 +71,9 @@ func TestProxyCONNECTFailureIsNotTargetReachability(t *testing.T) {
 	}))
 	defer proxy.Close()
 	client, err := NewClient(proxy.URL, time.Second)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	r := Probe(context.Background(), client, Target{Name: "github", URL: "https://example.invalid/"})
 	if r.Status != Fail || r.HTTPCode != 0 {
 		t.Fatalf("proxy-generated 502 must not count as remote HTTP response: %+v", r)
@@ -74,5 +90,7 @@ func TestNewClientRequiresExplicitProxy(t *testing.T) {
 	if err != nil || client.Timeout != 10*time.Second {
 		t.Fatalf("unexpected client: %v", err)
 	}
-	if client.CheckRedirect == nil { t.Fatal("redirect behavior not explicit") }
+	if client.CheckRedirect == nil {
+		t.Fatal("redirect behavior not explicit")
+	}
 }
