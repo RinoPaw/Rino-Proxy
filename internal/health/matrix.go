@@ -106,7 +106,7 @@ func EvaluateMatrix(rows []NodeResult) Matrix {
 			m.SingleNodePass = true
 		}
 		for _, site := range row.Results {
-			if site.Status == Pass {
+			if Accepted(site) {
 				m.Coverage[site.Name] = true
 			}
 		}

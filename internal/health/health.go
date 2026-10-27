@@ -189,11 +189,18 @@ func ProbeAll(ctx context.Context, client *http.Client, targets []Target) []Resu
 	return results
 }
 
+// Accepted reflects deployment reachability criteria while preserving the raw
+// CHALLENGE status. ChatGPT HTTP 403 is tolerated; HTTP 401 and other site
+// challenges are still failures.
+func Accepted(r Result) bool {
+	return r.Status == Pass || (r.Name == "chatgpt" && r.Status == Challenge && r.HTTPCode == 403)
+}
+
 // Satisfies checks: bilibili && github && (google || youtube || chatgpt).
 func Satisfies(results []Result) bool {
 	pass := make(map[string]bool, len(results))
 	for _, r := range results {
-		pass[r.Name] = pass[r.Name] || r.Status == Pass
+		pass[r.Name] = pass[r.Name] || Accepted(r)
 	}
 	return pass["bilibili"] && pass["github"] &&
 		(pass["google"] || pass["youtube"] || pass["chatgpt"])
