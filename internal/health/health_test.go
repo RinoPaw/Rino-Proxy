@@ -1,6 +1,7 @@
 package health
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -44,7 +45,7 @@ func TestProbeAcceptsRedirectWithoutFollowing(t *testing.T) {
 	defer srv.Close()
 	client := srv.Client()
 	client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
-	r := Probe(t.Context(), client, Target{Name: "github", URL: srv.URL})
+	r := Probe(context.Background(), client, Target{Name: "github", URL: srv.URL})
 	if r.Status != Pass || r.HTTPCode != 302 || calls != 1 {
 		t.Fatalf("expected original HTTPS response, not redirect follow: %+v; calls=%d", r, calls)
 	}
@@ -57,7 +58,7 @@ func TestProxyCONNECTFailureIsNotTargetReachability(t *testing.T) {
 	defer proxy.Close()
 	client, err := NewClient(proxy.URL, time.Second)
 	if err != nil { t.Fatal(err) }
-	r := Probe(t.Context(), client, Target{Name: "github", URL: "https://example.invalid/"})
+	r := Probe(context.Background(), client, Target{Name: "github", URL: "https://example.invalid/"})
 	if r.Status != Fail || r.HTTPCode != 0 {
 		t.Fatalf("proxy-generated 502 must not count as remote HTTP response: %+v", r)
 	}
