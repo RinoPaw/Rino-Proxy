@@ -155,3 +155,26 @@ are performed by `core status`.** Transactional apply and rollback remain
 future work. Selected group/node *names* can still be sensitive: review
 output before sharing logs. This is a read-only development milestone, not
 a replacement for OpenClash or a production deployment instruction.
+
+## v0.4: offline configuration preflight (read-only)
+
+```sh
+rino core plan --current current.yaml --candidate candidate.yaml --mihomo mihomo
+rino core plan --current current.yaml --candidate candidate.yaml --mihomo mihomo --json
+```
+
+The command reads two **distinct, regular local files** (up to 16 MiB),
+rejects final-component symlinks and multi-document or malformed YAML, and
+reports SHA-256 fingerprints plus **field names only**. Unknown YAML keys are
+redacted as `other-top-level`; all network-affecting differences are marked
+high-risk. It then invokes the actual Mihomo binary using
+`-t -f <absolute candidate path>`. Use `--home DIR` if the candidate requires
+a specific Mihomo working directory. Command output and validator diagnostics
+are withheld because they may contain subscriptions or credentials.
+
+This preflight deliberately **never writes a configuration or reloads Mihomo**.
+A syntactically valid candidate can still break DNS, system routes or the
+management path, so the JSON field `apply_allowed` is always `false`.
+A future write-capable transaction will require durable rollback, a watchdog,
+and an independent management channel. Do not use this report alone to
+authorize production changes.
