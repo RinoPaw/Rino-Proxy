@@ -1,60 +1,65 @@
 package health
 
 import (
-	"bytes"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 )
 
-func TestSatisfies(t *testing.T) {
-	data := []Result{
-		{Name: "bilibili", Status: Pass},
-		{Name: "github", Status: Pass},
+func TestSatisfiesByRemoteHTTPResponse(t *testing.T) {
+	results := []Result{
+		{Name: "bilibili", Status: Pass, HTTPCode: 503},
+		{Name: "github", Status: Pass, HTTPCode: 401},
 		{Name: "google", Status: Fail},
-		{Name: "youtube", Status: Pass},
-		{Name: "chatgpt", Status: Challenge},
+		{Name: "youtube", Status: Fail},
+		{Name: "chatgpt", Status: Pass, HTTPCode: 403},
 	}
-	if !Satisfies(data) {
-		t.Fatal("expected successful boolean criterion")
+	if !Satisfies(results) { t.Fatal("remote responses should satisfy the network condition") }
+	results[4].HTTPCode = 0
+	if Satisfies(results) { t.Fatal("no response from any third-term site") }
+	results[2].HTTPCode = 429
+	if !Satisfies(results) { t.Fatal("Google responding HTTP 429 still means reachable") }
+	results[1].HTTPCode = 0
+	if Satisfies(results) { t.Fatal("GitHub must be reachable") }
+}
+
+func TestClassifyAnyHTTPStatus(t *testing.T) {
+	for _, code := range []int{200, 204, 301, 401, 403, 404, 429, 500, 503} {
+		r := Classify(Result{Name: "bilibili", HTTPCode: code, Status: Fail}, []byte("anything"))
+		if r.Status != Pass { t.Fatalf("HTTP %d counted as failure: %+v", code, r) }
 	}
-	data[3].Status = Fail
-	if Satisfies(data) {
-		t.Fatal("all third-term alternatives failed")
-	}
-	data[2].Status = Pass
-	data[0].Status = Challenge
-	if Satisfies(data) {
-		t.Fatal("challenged Bilibili must not count as success")
+	for _, code := range []int{0, 99, 600} {
+		r := Classify(Result{Name: "chatgpt", HTTPCode: code}, nil)
+		if r.Status != Fail { t.Fatalf("invalid HTTP code %d accepted", code) }
 	}
 }
 
-func TestClassifyBilibiliUnauthenticated(t *testing.T) {
-	result := Classify(Result{Name: "bilibili", HTTPCode: 200}, []byte(`{"code":-101,"message":"Account is not logged in"}`))
-	if result.Status != Pass {
-		t.Fatalf("unauthenticated but reachable API: %+v", result)
+func TestProbeAcceptsRedirectWithoutFollowing(t *testing.T) {
+	calls := 0
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		http.Redirect(w, r, "https://example.invalid/redirect", http.StatusFound)
+	}))
+	defer srv.Close()
+	client := srv.Client()
+	client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
+	r := Probe(t.Context(), client, Target{Name: "github", URL: srv.URL})
+	if r.Status != Pass || r.HTTPCode != 302 || calls != 1 {
+		t.Fatalf("expected original HTTPS response, not redirect follow: %+v; calls=%d", r, calls)
 	}
 }
 
-func TestClassifyCloudflareAndRateLimit(t *testing.T) {
-	for _, tcase := range []struct {
-		name string
-		code int
-		body []byte
-		want Status
-	}{
-		{"chatgpt", 403, []byte("Just a moment"), Challenge},
-		{"github", 429, nil, Limited},
-		{"bilibili", 200, []byte(`{"code":-352}`), Challenge},
-		{"google", 204, nil, Pass},
-		{"github", 200, []byte("GitHub home"), Pass},
-		{"youtube", 200, []byte("YouTube home"), Pass},
-		{"chatgpt", 200, []byte("Cloudflare challenge-platform"), Challenge},
-	} {
-		actual := Classify(Result{Name: tcase.name, HTTPCode: tcase.code}, tcase.body)
-		if actual.Status != tcase.want {
-			t.Fatalf("%s HTTP %d: got %+v, want %s", tcase.name, tcase.code, actual, tcase.want)
-		}
+func TestProxyCONNECTFailureIsNotTargetReachability(t *testing.T) {
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer proxy.Close()
+	client, err := NewClient(proxy.URL, time.Second)
+	if err != nil { t.Fatal(err) }
+	r := Probe(t.Context(), client, Target{Name: "github", URL: "https://example.invalid/"})
+	if r.Status != Fail || r.HTTPCode != 0 {
+		t.Fatalf("proxy-generated 502 must not count as remote HTTP response: %+v", r)
 	}
 }
 
@@ -68,12 +73,5 @@ func TestNewClientRequiresExplicitProxy(t *testing.T) {
 	if err != nil || client.Timeout != 10*time.Second {
 		t.Fatalf("unexpected client: %v", err)
 	}
-}
-
-func TestClassifyUnexpectedBody(t *testing.T) {
-	for _, label := range []string{"github", "youtube"} {
-		if r := Classify(Result{Name: label, HTTPCode: http.StatusOK}, bytes.Repeat([]byte("x"), 64)); r.Status == Pass {
-			t.Fatalf("accepted invalid %s response", label)
-		}
-	}
+	if client.CheckRedirect == nil { t.Fatal("redirect behavior not explicit") }
 }
