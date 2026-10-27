@@ -2,45 +2,27 @@ package health
 
 import "testing"
 
-func TestToleratedChatGPT403(t *testing.T) {
-	rows := []Result{
-		{Name: "bilibili", Status: Pass, HTTPCode: 200},
-		{Name: "github", Status: Pass, HTTPCode: 200},
-		{Name: "google", Status: Fail},
-		{Name: "youtube", Status: Fail},
-		{Name: "chatgpt", Status: Challenge, HTTPCode: 403},
+func TestAnyStatusIsReachableWhenReceivedFromTarget(t *testing.T) {
+	for _, code := range []int{200, 204, 302, 401, 403, 404, 429, 500, 503} {
+		for _, status := range []Status{Pass, Fail, Challenge, Limited} {
+			result := Result{Name: "github", Status: status, HTTPCode: code}
+			if !Accepted(result) { t.Fatalf("remote HTTP %d (%s) incorrectly rejected", code, status) }
+		}
 	}
-	if !Satisfies(rows) {
-		t.Fatal("ChatGPT 403 must satisfy the chosen availability rule")
-	}
-	if !Accepted(rows[4]) {
-		t.Fatal("ChatGPT 403 not accepted")
-	}
-	rows[4].HTTPCode = 401
-	if Satisfies(rows) {
-		t.Fatal("401 must stay unavailable")
-	}
-	rows[4].HTTPCode = 403
-	rows[4].Status = Fail
-	if Satisfies(rows) {
-		t.Fatal("HTTP 403 with unexpected classification must not count")
-	}
-	rows[4].Status = Challenge
-	rows[4].Name = "bilibili"
-	if Accepted(rows[4]) {
-		t.Fatal("other website 403 must not be accepted")
+	for _, code := range []int{0, -1, 99, 600} {
+		if Accepted(Result{Name: "chatgpt", Status: Pass, HTTPCode: code}) {
+			t.Fatalf("no valid target response (code %d) must fail", code)
+		}
 	}
 }
 
-func TestMatrixCoverageToleratesChatGPT403(t *testing.T) {
-	output := EvaluateMatrix([]NodeResult{
-		{Node: "first", Results: []Result{{Name: "bilibili", Status: Pass}, {Name: "github", Status: Pass}}},
+func TestMatrixCoverageAcrossNodesUsesResponseEvidence(t *testing.T) {
+	result := EvaluateMatrix([]NodeResult{
+		{Node: "first", Passed: true, Results: []Result{{Name: "bilibili", HTTPCode: 503}, {Name: "github", HTTPCode: 401}}},
 		{Node: "second", Results: []Result{{Name: "chatgpt", Status: Challenge, HTTPCode: 403}}},
 	})
-	if !output.CoveragePassed || output.SingleNodePass {
-		t.Fatalf("bad cross-node matrix: %+v", output)
+	if !result.CoveragePassed || result.SingleNodePass {
+		t.Fatalf("incorrect overall connectivity: %+v", result)
 	}
-	if !output.Coverage["chatgpt"] {
-		t.Fatal("403 not counted in allowed site coverage")
-	}
+	if !result.Coverage["chatgpt"] { t.Fatal("HTTP 403 was not treated as reachable") }
 }
