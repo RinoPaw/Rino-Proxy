@@ -315,3 +315,35 @@ failure injection and an opt-in isolated real-core test that forcibly
 terminates the manager, then verifies independent recovery. External HTTP
 status responses establish reachability only and do not prove application
 access or login readiness.
+
+
+## OpenWrt / ImmortalWrt local proxy controller
+
+OpenWrt commonly binds Mihomo's mixed HTTP proxy to the router's LAN
+interface address while keeping the management controller on loopback.
+`rino core trial` and `rino core deploy` accept `--proxy` values
+whose literal IP is assigned to a **local interface** of the same host:
+
+```sh
+rino core status --controller http://127.0.0.1:9091
+rino core trial --state PRIVATE_ARCHIVE \
+  --controller http://127.0.0.1:9091 \
+  --proxy http://192.168.8.1:7890 --hold 10s
+```
+
+Replace `192.168.8.1` with your own router's actual LAN address.
+Only local interface IPs and loopback addresses are accepted as proxy
+listeners. Remote Tailnet peers, public servers, DNS hostnames and URLs
+carrying credentials are rejected. The controller remains **loopback-only**.
+
+The `rino` CLI is separate from the running `mihomo` daemon. Upgrading
+the CLI binary does not change routing rules, DNS, firewall, or live
+proxy connections. Keep a copy of the previous CLI binary, test
+`rino core status` against the live loopback controller after upgrading,
+and preserve the original procd startup configuration.
+
+A LAN-bound mixed-port provides an **explicit HTTP/SOCKS proxy** to
+clients configured to use it. Automatic transparent proxying for all Wi-Fi
+users requires separate DHCP, firewall and routing engineering, including
+an independent recovery path and acceptance tests. Do not assume that
+opening a LAN proxy port automatically redirects all client traffic.
