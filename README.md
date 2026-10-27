@@ -220,4 +220,3 @@ rino core archive export --state NEW_PRIVATE_DIR --output NEW_RECOVERY_FILE.yaml
 The next stage of Issue #2 is an independently recoverable deployment
 transaction with a separate supervisor/watchdog and a real emergency path.
 
-[executed on device: rino-pc (6c706f50-a21c-4a1f-9bbf-39635d313ad0)]

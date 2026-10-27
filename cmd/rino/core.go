@@ -58,4 +58,3 @@ func runCore(args []string, output io.Writer) error {
 	return nil
 }
 
-[executed on device: rino-pc (6c706f50-a21c-4a1f-9bbf-39635d313ad0)]
