@@ -60,7 +60,7 @@ func TestRenderGroupsRulesAndCredentials(t *testing.T) {
 	found := false
 	for _, g := range cfg.Groups {
 		if g.Name == "Rino-ChatGPT" {
-			if g.Type != "fallback" || len(g.Proxies) != 3 || g.Proxies[0] != "B" || g.Proxies[1] != "A" || g.Proxies[2] != "TX" {
+			if g.Type != "fallback" || len(g.Proxies) != 3 || g.Proxies[0] != "A" || g.Proxies[1] != "B" || g.Proxies[2] != "TX" {
 				t.Fatalf("wrong chatgpt: %+v", g)
 			}
 			found = true
@@ -69,8 +69,8 @@ func TestRenderGroupsRulesAndCredentials(t *testing.T) {
 	if !found {
 		t.Fatal("ChatGPT group absent")
 	}
-	if !strings.Contains(string(output), "expected-status: 200/403") {
-		t.Fatal("HTTP 403 acceptance not configured")
+	if !strings.Contains(string(output), "expected-status: \u0027*\u0027") && !strings.Contains(string(output), "expected-status: \"*\"") {
+		t.Fatal("wildcard HTTP response acceptance not configured")
 	}
 	a, b := -1, -1
 	for i, r := range cfg.Rules {
