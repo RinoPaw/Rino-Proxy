@@ -220,3 +220,51 @@ rino core archive export --state NEW_PRIVATE_DIR --output NEW_RECOVERY_FILE.yaml
 The next stage of Issue #2 is an independently recoverable deployment
 transaction with a separate supervisor/watchdog and a real emergency path.
 
+
+
+## v0.4: bounded live core trial
+
+```sh
+# First prepare a private archive of the old/candidate configs.
+rino core archive prepare --current old.yaml --candidate next.yaml \
+  --state NEW_PRIVATE_DIR --mihomo /path/to/mihomo
+
+# On the SAME host as a disposable Mihomo instance:
+rino core trial --state NEW_PRIVATE_DIR \
+  --controller http://127.0.0.1:29794 \
+  --proxy http://127.0.0.1:29793 \
+  --target https://api.bilibili.com/x/web-interface/nav --hold 10s
+```
+
+`core trial` performs a real, time-bounded `PUT /configs` using Mihomo's
+in-memory YAML payload API. It requires a verified archive, checks that its
+original file is unchanged, inspects the existing runtime and tests outbound
+HTTPS connectivity before applying. After reloading the candidate, it checks
+the controller, runtime mode/listeners and HTTPS connectivity. **It always
+attempts to reload the original configuration**, including after a failed
+reload, failed health check or canceled test. It then checks the restored
+runtime and HTTPS again. The running config file on disk is untouched.
+
+For the first implementation, trial candidates cannot modify controller
+addresses, API credentials, proxy listeners, DNS, TUN, routing interfaces or
+other network-critical settings. Proxy lists, proxy groups, rules and mode
+can be tested. The REST interface is loopback-only; a remote controller
+requires an explicit SSH local port forward. The separate `--proxy` probe
+endpoint must also be local. HTTPS status codes indicate **network transport
+reachability only**, with application login or Cloudflare challenge status
+unverified.
+
+**Important limitation:** this is a foreground trial with best-effort
+rollback. A process crash, abrupt termination, host shutdown, or unreachable
+controller can prevent rollback. `core trial` must initially run against an
+independent disposable Mihomo process, *not* an unattended production gateway.
+The tests include a real isolated Mihomo v1.19.32 API round-trip
+(`rule → direct → rule`) and forced rollback errors; the real-core
+integration is opt-in via `RINO_TEST_ISOLATED=1` and
+`RINO_TEST_ISOLATED_STATE`, restricted to ports 29793/29794.
+The ordinary CLI additionally requires an actual external HTTPS proxy probe.
+External reachability varies by network; a failed baseline check prevents
+the candidate from being applied.
+
+Next: detached watchdog and transaction promotion to a persistent live
+config, with a separate recovery path.

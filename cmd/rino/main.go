@@ -22,6 +22,7 @@ Usage:
   rino core archive prepare --current old.yaml --candidate new.yaml --state NEW_DIR
   rino core archive verify --state DIR [--json]
   rino core archive export --state DIR --output NEW_FILE
+  rino core trial --state DIR --proxy http://127.0.0.1:PORT [--hold 10s]
   rino health check --proxy http://HOST:PORT [--timeout 15s] [--json]
   rino health matrix --limit 12 [--match REGEX] [--json]
   rino router render --output config.yaml [--upstream http://100.64.0.3:17890]
