@@ -1,6 +1,6 @@
 # Rino Proxy
 
-A small, cross-platform control plane for Mihomo. **v0.1 flattens local YAML profiles; v0.2 checks website reachability; v0.3 adds isolated node-by-site matrix probing.** It does not take over your live proxy or change OpenWrt.
+A small, cross-platform control plane for Mihomo. **v0.1 flattens local YAML profiles; v0.2 checks website reachability; v0.3 adds isolated node-by-site matrix probing.** The explicit-proxy beta is deployed on OpenWrt; the Tencent backup now hosts separate per-site fallback groups.
 
 ## Requirements
 
@@ -35,7 +35,7 @@ go run ./cmd/rino health check --proxy http://PROXY_HOST:PORT
 go run ./cmd/rino health check --proxy http://PROXY_HOST:PORT --json
 ```
 
-Each run checks Bilibili API (200 with code 0 or unauthenticated -101), GitHub home (200), Google generate_204 (204), YouTube (200), and ChatGPT (200 without challenge markers). Cloudflare challenges, rate limits, and unrecognized responses are distinguished. The final acceptance expression is `bilibili && github && (google || youtube || chatgpt)`.
+Each run checks Bilibili API (200 with code 0 or unauthenticated -101), GitHub home (200), Google generate_204 (204), YouTube (200), and ChatGPT (HTTP 200 or, by user-defined policy, Cloudflare challenge HTTP 403). A 403 remains reported as `CHALLENGE` and is accepted only for ChatGPT reachability; 401, timeouts, rate limits, and unexpected content remain failures. The final acceptance expression is `bilibili && github && (google || youtube || chatgpt)`.
 
 A successful website check only proves reachability from this proxy at that moment; it does not verify browser sign-in, video playback, Git operations, or all app features. The command requires an explicit HTTP proxy; it does not silently route traffic through Windows system proxy settings.
 
@@ -68,7 +68,7 @@ The output distinguishes **single-node pass** (one tested node satisfies the ful
 
 ## Deployed beta gateway on OpenWrt
 
-Rino Proxy can generate a LAN-scoped Mihomo configuration that uses a reachable, private HTTP proxy on Tailscale as upstream. This early deployment uses a **single Tailnet fallback**; it does not yet choose different airport nodes automatically per website.
+Rino Proxy can generate a LAN-scoped Mihomo configuration that uses a reachable, private HTTP proxy on Tailscale as upstream. The OpenWrt gateway uses a single Tailnet upstream. The **Tencent Mihomo core now selects different airport nodes per website** using dedicated `fallback` groups, while retaining the original `TX` group as the final backup.
 
 ```sh
 go run ./cmd/rino router render --output rino-router.generated.yaml \
@@ -102,6 +102,21 @@ Emergency rollback (removes only this beta gateway; does not touch Tailscale, WA
 ```
 
 The service uses OpenWrt's procd (late boot start, respawn). A single `RINO_PROXY_HEALTH` root crontab entry writes a snapshot under `/tmp` every 10 minutes; monitoring does not change routing or reboot the device. The router retains the existing Mihomo package. Real provider secrets must stay off GitHub.
+
+## Tencent site-specific policy groups
+
+The private Tencent backup endpoint (`100.64.0.3:17890`) now uses four groups: `Rino-GitHub`, `Rino-Google`, `Rino-YouTube`, and `Rino-ChatGPT`, plus the pre-existing `TX` fallback. The configuration was generated from a locally saved node-by-site measurement snapshot using:
+
+```sh
+rino policy render --base backup.yaml --matrix matrix.json --output candidate.yaml --max-per-site 8
+mihomo -t -f candidate.yaml
+```
+
+Never commit `backup.yaml`, `matrix.json`, or the generated config. In the ChatGPT group, HTTP 200 nodes are preferred over HTTP 403 candidates, with `expected-status: 200/403` for periodic node checks. HTTP 403 represents acceptable network reachability only; it does not prove an authenticated chat session works.
+
+The Tencent production config remains `/etc/mihomo/backup.yaml`. Rollback snapshots are stored locally as `/etc/mihomo/backup.yaml.rino-before-403` (previous site-based routing) and `/etc/mihomo/backup.yaml.rino-before-sites` (original TX-only routing). Both contain credentials and must remain private.
+
+The LAN remains **explicit proxy only**, with no firewall or TUN interception, and keeps `172.27.207.1:7890` as its entry point.
 
 ## Limits
 
