@@ -121,7 +121,7 @@ func TestReadGuards(t *testing.T) {
 	})
 	for label, yamlData := range map[string]string{
 		"empty": "", "sequence": "- x\n", "malformed": "ports: [\n",
-		"multidoc": "mode: rule\n---\nmode: direct\n",
+		"multidoc":  "mode: rule\n---\nmode: direct\n",
 		"duplicate": "mode: rule\nmode: direct\n",
 	} {
 		t.Run(label, func(t *testing.T) {
