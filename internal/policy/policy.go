@@ -40,7 +40,6 @@ var sites = []site{
 type candidate struct {
 	name string
 	ms   int64
-	rank int
 }
 type Summary struct {
 	Groups map[string]int `json:"groups"`
@@ -126,19 +125,14 @@ func Render(original, matrix []byte, maxPerSite int) ([]byte, Summary, error) {
 				if !strings.EqualFold(v.Name, site.name) {
 					continue
 				}
-				rank := -1
-				if v.Status == "PASS" && v.HTTPCode >= 200 && v.HTTPCode < 400 {
-					rank = 0
-				}
-				if site.name == "ChatGPT" && v.Status == "CHALLENGE" && v.HTTPCode == 403 {
-					rank = 1
-				}
-				if rank < 0 {
+				// Historical matrix rows can still say FAIL/CHALLENGE when
+				// the remote HTTPS server sent a valid HTTP response.
+				if v.HTTPCode < 100 || v.HTTPCode > 599 {
 					continue
 				}
 				old, seen := best[row.Node]
-				if !seen || rank < old.rank || (rank == old.rank && v.LatencyMS < old.ms) {
-					best[row.Node] = candidate{name: row.Node, ms: v.LatencyMS, rank: rank}
+				if !seen || v.LatencyMS < old.ms {
+					best[row.Node] = candidate{name: row.Node, ms: v.LatencyMS}
 				}
 			}
 		}
@@ -150,9 +144,6 @@ func Render(original, matrix []byte, maxPerSite int) ([]byte, Summary, error) {
 			ranks = append(ranks, value)
 		}
 		sort.Slice(ranks, func(i, j int) bool {
-			if ranks[i].rank != ranks[j].rank {
-				return ranks[i].rank < ranks[j].rank
-			}
 			if ranks[i].ms != ranks[j].ms {
 				return ranks[i].ms < ranks[j].ms
 			}
@@ -169,9 +160,8 @@ func Render(original, matrix []byte, maxPerSite int) ([]byte, Summary, error) {
 		group := "Rino-" + site.name
 		summary.Groups[group] = len(ranks)
 		groupConfig := map[string]any{"name": group, "type": "fallback", "proxies": names, "url": site.url, "interval": 180, "lazy": false, "timeout": 7000}
-		if site.name == "ChatGPT" {
-			groupConfig["expected-status"] = "200/403"
-		}
+		// Mihomo's wildcard allows any HTTP response for every site.
+		groupConfig["expected-status"] = "*"
 		kept = append(kept, groupConfig)
 	}
 	cfg["proxy-groups"] = kept
