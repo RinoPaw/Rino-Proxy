@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -87,24 +88,37 @@ func Probe(ctx context.Context, client *http.Client, target Target) Result {
 	}
 	defer response.Body.Close()
 	result.HTTPCode = response.StatusCode
-	// HTTPS CONNECT and TLS verification succeeded and the target responded.
-	// Avoid consuming page bodies: app content is outside transport-health scope.
-	return Classify(result, nil)
+	// Keep transport reachability independent from HTTP application access.
+	// Cloudflare announces an interstitial explicitly through cf-mitigated.
+	classified := Classify(result, nil)
+	if response.Header.Get("Cf-Mitigated") == "challenge" {
+		classified.Status = Challenge
+		classified.Detail = "HTTP challenge from intermediary; application access unverified"
+	}
+	return classified
 }
 
-// Classify intentionally ignores HTTP status semantics and page content.
-// Transport or TLS failures have no HTTP response and stay FAIL in Probe.
+// Classify reports HTTP application availability while Accepted separately
+// tracks whether the HTTPS target responded at all (transport reachability).
 func Classify(result Result, _ []byte) Result {
-	if result.HTTPCode >= 100 && result.HTTPCode <= 599 {
+	switch {
+	case result.HTTPCode >= 200 && result.HTTPCode < 400:
 		result.Status = Pass
-		if result.HTTPCode >= 400 {
-			result.Detail = "HTTP response received; application access unverified"
-		}
-	} else {
+	case result.HTTPCode == http.StatusTooManyRequests:
+		result.Status = Limited
+		result.Detail = "HTTP 429: rate limited"
+	case result.HTTPCode >= 400 && result.HTTPCode <= 599:
 		result.Status = Fail
-		result.Detail = "no valid HTTP response"
+		result.Detail = fmtHTTPStatus(result.HTTPCode)
+	default:
+		result.Status = Fail
+		result.Detail = "no successful HTTP response"
 	}
 	return result
+}
+
+func fmtHTTPStatus(code int) string {
+	return "HTTP " + strconv.Itoa(code) + ": application access failed or unavailable"
 }
 
 func ProbeAll(ctx context.Context, client *http.Client, targets []Target) []Result {
@@ -132,6 +146,17 @@ func Satisfies(results []Result) bool {
 	pass := make(map[string]bool, len(results))
 	for _, r := range results {
 		pass[r.Name] = pass[r.Name] || Accepted(r)
+	}
+	return pass["bilibili"] && pass["github"] &&
+		(pass["google"] || pass["youtube"] || pass["chatgpt"])
+}
+
+// SatisfiesService applies the same overall target condition to service-level
+// HTTP statuses. It intentionally excludes challenges, throttles and 4xx/5xx.
+func SatisfiesService(results []Result) bool {
+	pass := make(map[string]bool, len(results))
+	for _, r := range results {
+		pass[r.Name] = pass[r.Name] || r.Status == Pass
 	}
 	return pass["bilibili"] && pass["github"] &&
 		(pass["google"] || pass["youtube"] || pass["chatgpt"])

@@ -33,18 +33,55 @@ func TestSatisfiesByRemoteHTTPResponse(t *testing.T) {
 	}
 }
 
-func TestClassifyAnyHTTPStatus(t *testing.T) {
-	for _, code := range []int{200, 204, 301, 401, 403, 404, 429, 500, 503} {
-		r := Classify(Result{Name: "bilibili", HTTPCode: code, Status: Fail}, []byte("anything"))
-		if r.Status != Pass {
-			t.Fatalf("HTTP %d counted as failure: %+v", code, r)
+func TestClassifyHTTPStatusSeparatesServiceFromTransport(t *testing.T) {
+	cases := []struct {
+		code int
+		want Status
+	}{
+		{200, Pass}, {204, Pass}, {301, Pass},
+		{401, Fail}, {403, Fail}, {404, Fail},
+		{429, Limited}, {500, Fail}, {503, Fail},
+		{0, Fail}, {99, Fail}, {600, Fail},
+	}
+	for _, tc := range cases {
+		r := Classify(Result{Name: "chatgpt", HTTPCode: tc.code}, nil)
+		if r.Status != tc.want {
+			t.Fatalf("HTTP %d: got %s, want %s", tc.code, r.Status, tc.want)
+		}
+		if Accepted(r) != (tc.code >= 100 && tc.code <= 599) {
+			t.Fatalf("transport mismatch for HTTP %d: %+v", tc.code, r)
 		}
 	}
-	for _, code := range []int{0, 99, 600} {
-		r := Classify(Result{Name: "chatgpt", HTTPCode: code}, nil)
-		if r.Status != Fail {
-			t.Fatalf("invalid HTTP code %d accepted", code)
-		}
+}
+
+func TestProbeDetectsCloudflareChallenge(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cf-Mitigated", "challenge")
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer srv.Close()
+	r := Probe(context.Background(), srv.Client(), Target{Name: "chatgpt", URL: srv.URL})
+	if r.Status != Challenge || r.HTTPCode != 403 || !Accepted(r) {
+		t.Fatalf("challenge must count as transport-only reachability: %+v", r)
+	}
+}
+
+func TestServiceConditionRejectsChallengeAndServerErrors(t *testing.T) {
+	rows := []Result{
+		{Name: "bilibili", Status: Pass, HTTPCode: 200},
+		{Name: "github", Status: Pass, HTTPCode: 200},
+		{Name: "chatgpt", Status: Challenge, HTTPCode: 403},
+	}
+	if !Satisfies(rows) || SatisfiesService(rows) {
+		t.Fatal("transport passed, service access must remain unverified")
+	}
+	rows = append(rows, Result{Name: "google", Status: Pass, HTTPCode: 204})
+	if !SatisfiesService(rows) {
+		t.Fatal("working Google should satisfy the third service")
+	}
+	rows[0].Status = Fail
+	if SatisfiesService(rows) {
+		t.Fatal("failed Bilibili must not satisfy the service condition")
 	}
 }
 

@@ -32,12 +32,14 @@ func runHealth(args []string, output io.Writer) error {
 		return err
 	}
 	results := health.ProbeAll(context.Background(), client, health.DefaultTargets)
-	passed := health.Satisfies(results)
+	transportPassed := health.Satisfies(results)
+	passed := health.SatisfiesService(results)
 	if *jsonOutput {
 		if err := json.NewEncoder(output).Encode(struct {
-			Results []health.Result `json:"results"`
-			Passed  bool            `json:"passed"`
-		}{Results: results, Passed: passed}); err != nil {
+			Results         []health.Result `json:"results"`
+			Passed          bool            `json:"passed"`
+			TransportPassed bool            `json:"transport_passed"`
+		}{Results: results, Passed: passed, TransportPassed: transportPassed}); err != nil {
 			return err
 		}
 		if !passed {
@@ -51,7 +53,7 @@ func runHealth(args []string, output io.Writer) error {
 			return err
 		}
 	}
-	_, err = fmt.Fprintf(output, "bilibili && github && (google || youtube || chatgpt): %t\n", passed)
+	_, err = fmt.Fprintf(output, "bilibili && github && (google || youtube || chatgpt): %t (transport: %t)\n", passed, transportPassed)
 	if err != nil {
 		return err
 	}

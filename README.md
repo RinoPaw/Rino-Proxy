@@ -94,6 +94,16 @@ rino health check --proxy http://172.27.207.1:7890 --timeout 12s --json
 cat /tmp/rino-health.json  # monitoring snapshot (every 10 minutes)
 ```
 
+The health check now reports application-level HTTP status for each site:
+`PASS` for 2xx/3xx, `CHALLENGE` for a response carrying
+`cf-mitigated: challenge`, `RATE_LIMIT` for HTTP 429, and `FAIL`
+for other HTTP errors or failed connections. JSON `passed` applies the
+existing overall site condition to those application results; the separate
+`transport_passed` applies it to any valid HTTPS response. In particular,
+an HTTP 403 Cloudflare interstitial proves transport reachability but does
+not establish ChatGPT usability. The aggregate condition may pass even when
+one individual site is challenged; inspect `results[]` for each service.
+
 Emergency rollback (removes only this beta gateway; does not touch Tailscale, WAN or Tencent):
 
 ```sh
