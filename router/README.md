@@ -91,6 +91,6 @@ IPv6 findings:
 
 There is currently no routed IPv6 Internet traffic to capture. IPv6 TPROXY is deliberately deferred; keep ULA and Yggdrasil direct.
 
-The active Tencent config has TX (47-node URL-test) and one generic 通用出口 fallback group (12 ordered candidates plus TX). No Rino-* groups are active. A fresh isolated matrix tested all 12 candidates on 2026-11-02; all returned HTTP 403 for ChatGPT and none returned HTTP 200. The matrix is stored locally in the ignored matrix-results-2026-11-02.local.json.
+The active Tencent config has TX (47-node URL-test) and one generic 通用出口 fallback group (12 ordered candidates plus TX). No Rino-* groups are active. A fresh isolated matrix tested all 12 candidates on 2026-11-02; 11 returned HTTP 403 for ChatGPT and one Singapore node timed out (HTTP 0). HTTP 403 is valid transport reachability in health.Accepted; the timeout is the only candidate without an HTTP response in this sample. The matrix is stored locally in the ignored matrix-results-2026-11-02.local.json.
 
 Verification note: service stop/start rollback passed, but a full router reboot has not yet been tested.

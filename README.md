@@ -141,7 +141,7 @@ The active configuration has no per-site Rino-* groups. Domain rules for GitHub,
 
 The old internal/policy.Render implementation and its tests still generate four Rino-* groups. That generator is stale relative to production. Do not use rino policy render to update a live config until it is refactored to emit the single generic group. Credentials-bearing historical configs remain private and must not be committed.
 
-A fresh isolated matrix on 2026-11-02 tested all 12 candidates from 通用出口. Every candidate returned HTTP 403 for chatgpt.com; none returned HTTP 200. A separate Rino-ChatGPT group would not solve this with the current candidate pool. Measurements remain local in the ignored matrix-results-2026-11-02.local.json.
+A fresh isolated matrix on 2026-11-02 tested all 12 candidates from 通用出口. Eleven returned HTTP 403 from chatgpt.com; one Singapore node timed out (HTTP 0). HTTP 403 counts as transport reachability in health.Accepted, while the application-level status remains FAIL or CHALLENGE. The timeout is the only candidate with no HTTP response in this sample. Measurements remain local in the ignored matrix-results-2026-11-02.local.json.
 
 The active Tencent configuration is /etc/mihomo/config.yaml. Historical backups are not active configuration.
 
