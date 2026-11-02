@@ -1,6 +1,23 @@
 # Rino Proxy
 
-A small, cross-platform control plane for Mihomo. **v0.1 flattens local YAML profiles; v0.2 checks website reachability; v0.3 adds isolated node-by-site matrix probing.** The explicit-proxy beta is deployed on OpenWrt; the Tencent backup now hosts separate per-site fallback groups.
+## Current deployment snapshot (2026-11-02)
+
+The live OpenWrt router now has two independent transparent ingress paths:
+- LAN IPv4 TCP 80/443 redirects to Mihomo port 7893.
+- LAN IPv4 UDP/443 uses nftables TPROXY, policy routing and Mihomo port 7894.
+- DNS goes through dnsmasq to Mihomo DNS at 127.0.0.1:1053.
+- Other TCP/UDP ports remain direct. IPv6 currently has no WAN6 default route; only LAN ULA and Yggdrasil routes exist.
+
+The active Tencent configuration at /etc/mihomo/config.yaml has TX and one generic 通用出口 fallback group. There are no active Rino-GitHub, Rino-Google, Rino-YouTube or Rino-ChatGPT groups.
+
+A fresh isolated matrix tested all 12 current 通用出口 candidates on 2026-11-02. Every candidate returned HTTP 403 for chatgpt.com; none returned HTTP 200. A per-site ChatGPT group cannot solve the current challenge using this candidate pool. Measurements remain local in matrix-results-2026-11-02.local.json.
+
+Important source drift: rino router render still emits the older explicit-proxy profile, and rino policy render still generates per-site Rino-* groups. Neither renderer currently reproduces the live transparent deployment. Do not use those generated files to replace production configuration until they are aligned with the deployed design.
+
+See router/README.md for current traffic coverage, IPv6 findings, verification and rollback. Historical sections below describe earlier project stages and should be read with this snapshot in mind.
+
+
+A small, cross-platform control plane for Mihomo. **v0.1 flattens local YAML profiles; v0.2 checks website reachability; v0.3 adds isolated node-by-site matrix probing.** The live OpenWrt deployment now includes transparent TCP/UDP ingress. Tencent currently uses one generic fallback group; per-site group generation remains legacy code and is not aligned with production.
 
 ## Requirements
 
@@ -84,7 +101,7 @@ On the JCG Q30 PRO OpenWrt router, the deployed files are:
 
 The live LAN proxy listens at `172.27.207.1:7890`. Its HTTP/SOCKS mixed-port accepts connections from the local `172.27.207.0/24` network; **there is currently no LAN proxy password**, so keep the Wi-Fi/LAN trusted. WAN and Tailscale interfaces have no new proxy listener. DNS, firewall, default route, TUN and transparent interception are unchanged.
 
-Domestic Bilibili domains route DIRECT; GitHub, Google, YouTube and ChatGPT domains go through the Tencent Tailnet upstream. Everything else defaults to DIRECT. This is an explicit-proxy beta; clients must configure the LAN proxy manually. The upstream Tencent server handles its own node pool. Cloudflare challenges may still block ChatGPT.
+TCP 80/443 traffic enters the router Mihomo rule engine; UDP/443 uses the generic NETWORK,UDP rule and a SOCKS5 UDP upstream. DNS is handled separately by dnsmasq forwarding to Mihomo DNS. Other TCP ports and other UDP ports remain direct. See router/README.md for the exact capture scope, IPv6 state and rollback procedure.
 
 ```sh
 # On the router, as root:
@@ -113,24 +130,24 @@ Emergency rollback (removes only this beta gateway; does not touch Tailscale, WA
 
 The service uses OpenWrt's procd (late boot start, respawn). A single `RINO_PROXY_HEALTH` root crontab entry writes a snapshot under `/tmp` every 10 minutes; monitoring does not change routing or reboot the device. The router retains the existing Mihomo package. Real provider secrets must stay off GitHub.
 
-## Tencent site-specific policy groups
+## Tencent generic egress policy
 
-The private Tencent backup endpoint (`100.64.0.3:17890`) now uses four groups: `Rino-GitHub`, `Rino-Google`, `Rino-YouTube`, and `Rino-ChatGPT`, plus the pre-existing `TX` fallback. The configuration was generated from a locally saved node-by-site measurement snapshot using:
+The active Tencent service reads /etc/mihomo/config.yaml and has two main groups:
 
-```sh
-rino policy render --base backup.yaml --matrix matrix.json --output candidate.yaml --max-per-site 8
-mihomo -t -f candidate.yaml
-```
+- TX: URL-test group containing 47 provider nodes.
+- 通用出口: one ordered fallback group containing 12 candidate nodes, followed by TX.
 
-Never commit `backup.yaml`, `matrix.json`, or the generated config. Every site-specific `fallback` group uses `expected-status: '*'` so any HTTP response is accepted during periodic checks. Candidates are ordered by observed latency, regardless of HTTP status. HTTP reachability does not prove browser login, successful Git operations or that application requests work.
+The active configuration has no per-site Rino-* groups. Domain rules for GitHub, Google, YouTube, OpenAI and other services target the same generic egress group.
 
-The Tencent production config remains `/etc/mihomo/backup.yaml`. Rollback snapshots are stored locally as `/etc/mihomo/backup.yaml.rino-before-403` (previous site-based routing) and `/etc/mihomo/backup.yaml.rino-before-sites` (original TX-only routing). Both contain credentials and must remain private.
+The old internal/policy.Render implementation and its tests still generate four Rino-* groups. That generator is stale relative to production. Do not use rino policy render to update a live config until it is refactored to emit the single generic group. Credentials-bearing historical configs remain private and must not be committed.
 
-The LAN remains **explicit proxy only**, with no firewall or TUN interception, and keeps `172.27.207.1:7890` as its entry point.
+A fresh isolated matrix on 2026-11-02 tested all 12 candidates from 通用出口. Every candidate returned HTTP 403 for chatgpt.com; none returned HTTP 200. A separate Rino-ChatGPT group would not solve this with the current candidate pool. Measurements remain local in the ignored matrix-results-2026-11-02.local.json.
+
+The active Tencent configuration is /etc/mihomo/config.yaml. Historical backups are not active configuration.
 
 ## Limits
 
-Only inline YAML Profile nodes are supported. Provider-only YAML, remote URLs, encrypted sharing links and automatic subscription refresh are future work. Matrix mode switches individual nodes only in a **dedicated, disposable** Mihomo selector. The Tencent production config uses the matrix snapshot to build site-specific fallback groups, but the controller does not yet continuously refresh those candidate rankings.
+Only inline YAML Profile nodes are supported. Provider-only YAML, remote URLs, encrypted sharing links and automatic subscription refresh are future work. Matrix mode switches individual nodes only in a dedicated, disposable Mihomo selector. Production currently uses one generic 通用出口 fallback group. The policy renderer still generates legacy per-site groups and must be refactored before use. The controller does not continuously refresh candidate rankings.
 
 ## Security
 
@@ -139,7 +156,7 @@ The `testdata/` profiles use fake credentials and intentionally invalid hostname
 ## Next steps
 
 - v0.2: HTTPS target reachability and the acceptance expression (implemented; status codes intentionally ignored).
-- v0.3: isolated node-by-site matrix and Tencent site-specific fallback groups (implemented). Continuous scoring and anti-flap tuning remain future work.
+- v0.3: isolated node-by-site matrix implemented. Production later converged on one generic fallback group; the policy renderer still needs to be aligned with that design.
 - v0.4: production-safe Mihomo API control, reload/rollback and core adapters.
 - v0.5: Web dashboard and controlled Windows/OpenWrt deployment.
 

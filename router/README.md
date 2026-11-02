@@ -70,3 +70,27 @@ Before production: SOCKS5 UDP ASSOCIATE carried a real DNS exchange.
 After production: Windows curl with HTTP3-only returned HTTP 204 from
 Google (HTTP version 3); routing checks showed Chinese UDP -> DIRECT and
 external UDP -> Tencent-SOCKS-UDP. Service stop/start rollback was tested.
+
+## Current traffic coverage and IPv6 audit (2026-11-02)
+
+| Traffic | Path |
+|---|---|
+| LAN IPv4 TCP 80/443 | Existing nftables REDIRECT to Mihomo :7893 |
+| LAN IPv4 UDP 443 | Independent TPROXY to Mihomo :7894, fwmark 0x100, local route table 100 |
+| LAN DNS UDP/TCP 53 | dnsmasq 172.27.207.1:53 forwards to Mihomo DNS 127.0.0.1:1053 |
+| Other TCP/UDP ports | Direct; not intercepted |
+| IPv6 | ULA and Yggdrasil only; no IPv6 Internet default route |
+
+The rules apply only to LAN IPv4 source 172.27.207.0/24 entering br-lan. Router-originated traffic and Yggdrasil/campus WireGuard ingress are outside this capture path.
+
+IPv6 findings:
+- wan6 is down and there is no IPv6 default route.
+- LAN ULA prefix is fd6a:cc30:5866::/60.
+- Yggdrasil has its own 200::/7 route.
+- Mihomo DNS has ipv6: false.
+
+There is currently no routed IPv6 Internet traffic to capture. IPv6 TPROXY is deliberately deferred; keep ULA and Yggdrasil direct.
+
+The active Tencent config has TX (47-node URL-test) and one generic 通用出口 fallback group (12 ordered candidates plus TX). No Rino-* groups are active. A fresh isolated matrix tested all 12 candidates on 2026-11-02; all returned HTTP 403 for ChatGPT and none returned HTTP 200. The matrix is stored locally in the ignored matrix-results-2026-11-02.local.json.
+
+Verification note: service stop/start rollback passed, but a full router reboot has not yet been tested.
