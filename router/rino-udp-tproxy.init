@@ -1,0 +1,43 @@
+#!/bin/sh /etc/rc.common
+# Independent UDP/443 interception; starts after rino-proxy (same priority, alphabetic).
+START=99
+STOP=10
+EXTRA_COMMANDS="status"
+EXTRA_HELP="    status      Show UDP TPROXY and policy route"
+
+RULES=/etc/rino-udp-tproxy.nft
+TABLE=rino_udp_tproxy
+
+ready() {
+    for n in 1 2 3 4 5; do
+        netstat -lnup 2>/dev/null | grep -q ':7894 ' && return 0
+        sleep 1
+    done
+    return 1
+}
+
+start() {
+    [ -r "$RULES" ] || return 1
+    ready || { logger -t rino-udp 'UDP listener unavailable; leaving UDP direct'; return 1; }
+    modprobe nft_tproxy >/dev/null 2>&1 || return 1
+    nft -c -f "$RULES" || return 1
+    ip -4 route replace local 0.0.0.0/0 dev lo table 100 || return 1
+    if ! ip -4 rule show | grep -q 'fwmark 0x100/0x100 lookup 100'; then
+        ip -4 rule add pref 100 fwmark 0x100/0x100 lookup 100 || return 1
+    fi
+    if ! nft list table ip "$TABLE" >/dev/null 2>&1; then
+        nft -f "$RULES" || { stop; return 1; }
+    fi
+}
+
+stop() {
+    nft delete table ip "$TABLE" >/dev/null 2>&1 || :
+    ip -4 rule del pref 100 fwmark 0x100/0x100 lookup 100 >/dev/null 2>&1 || :
+    ip -4 route flush table 100 >/dev/null 2>&1 || :
+}
+
+status() {
+    nft list table ip "$TABLE" &&
+        ip -4 rule show | grep 'fwmark 0x100/0x100 lookup 100' &&
+        ip -4 route show table 100
+}

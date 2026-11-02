@@ -357,3 +357,7 @@ clients configured to use it. Automatic transparent proxying for all Wi-Fi
 users requires separate DHCP, firewall and routing engineering, including
 an independent recovery path and acceptance tests. Do not assume that
 opening a LAN proxy port automatically redirects all client traffic.
+
+## OpenWrt UDP/443 transparent ingress
+
+The independent, reversible UDP TPROXY deployment and its validation are documented in [router/README.md](router/README.md). TCP REDIRECT and the Mesh transport stay separate.

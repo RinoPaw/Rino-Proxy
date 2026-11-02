@@ -1,0 +1,11 @@
+# Independent LAN IPv4 UDP/443 interception. Existing TCP REDIRECT remains untouched.
+table ip rino_udp_tproxy {
+  chain prerouting {
+    type filter hook prerouting priority mangle; policy accept;
+    iifname "br-lan" ip saddr 172.27.207.0/24 ip daddr != {
+      0.0.0.0/8, 10.0.0.0/8, 100.64.0.0/10, 127.0.0.0/8,
+      169.254.0.0/16, 172.16.0.0/12, 192.168.0.0/16,
+      224.0.0.0/4, 240.0.0.0/4
+    } udp dport 443 counter tproxy to :7894 meta mark set 0x100 accept
+  }
+}
